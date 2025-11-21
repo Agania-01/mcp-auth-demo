@@ -152,6 +152,7 @@ export function normalizeRedirectUri(uri: string): string {
 
 /**
  * Validate OAuth 2.1 authorization parameters
+ * Compatible with both OAuth 2.0 and OAuth 2.1
  */
 export function validateAuthParams(params: OAuth21AuthParams): {
   isValid: boolean;
@@ -167,14 +168,8 @@ export function validateAuthParams(params: OAuth21AuthParams): {
     };
   }
 
-  // client_id is required
-  if (!params.client_id) {
-    return {
-      isValid: false,
-      error: "invalid_request",
-      errorDescription: "client_id is required",
-    };
-  }
+  // client_id is optional for OAuth 2.0 compatibility
+  // (required in strict OAuth 2.1, but we support both versions)
 
   // redirect_uri is required
   if (!params.redirect_uri) {

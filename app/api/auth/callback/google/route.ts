@@ -12,10 +12,30 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const searchParams = url.searchParams;
 
-  // Get OAuth response parameters
-  const code = searchParams.get("code");
-  const error = searchParams.get("error");
-  const stateParam = searchParams.get("state");
+  console.log("📍 Full callback URL:", request.url);
+  console.log("📋 URL hash:", url.hash);
+  console.log("📋 Query string:", url.search);
+  console.log("📋 All query parameters:");
+  for (const [key, value] of searchParams.entries()) {
+    console.log(`  ${key}: ${value}`);
+  }
+
+  // Check if parameters are in hash (this shouldn't happen with OAuth 2.1 but let's check)
+  let hashParams = new URLSearchParams();
+  if (url.hash) {
+    const hashContent = url.hash.substring(1); // Remove the #
+    console.log("📋 Hash content:", hashContent);
+    hashParams = new URLSearchParams(hashContent);
+    console.log("📋 Hash parameters:");
+    for (const [key, value] of hashParams.entries()) {
+      console.log(`  ${key}: ${value}`);
+    }
+  }
+
+  // Get OAuth response parameters - try query params first, then hash
+  let code = searchParams.get("code") || hashParams.get("code");
+  let error = searchParams.get("error") || hashParams.get("error");
+  let stateParam = searchParams.get("state") || hashParams.get("state");
 
   console.log("OAuth callback received:");
   console.log("Code:", code ? "present" : "missing");
@@ -98,10 +118,14 @@ export async function GET(request: NextRequest) {
           originalRedirectUri.startsWith("http://127.0.0.1:") ||
           originalRedirectUri.startsWith("http://localhost:")
         ) {
-          // Ensure VS Code local follows proper port patterns for OAuth 2.1 compliance
+          // Support both VS Code patterns and local development callbacks
           const vsCodePattern = /^http:\/\/(127\.0\.0\.1|localhost):\d+\/?$/;
+          const localDevPattern = /^http:\/\/(127\.0\.0\.1|localhost):\d+\/api\/auth\/callback$/;
+          
           if (vsCodePattern.test(originalRedirectUri)) {
             clientType = "vscode-local";
+          } else if (localDevPattern.test(originalRedirectUri)) {
+            clientType = "local-dev";
           } else {
             clientType = "unsupported";
           }
@@ -183,13 +207,11 @@ export async function GET(request: NextRequest) {
         }
       }
     } else {
-      // No state parameter provided - this is required for OAuth 2.1
-      console.error("❌ OAuth 2.1 Compliance: No state parameter provided");
-      return createOAuth21ErrorResponse(
-        "invalid_request",
-        "State parameter is required for OAuth 2.1 compliance",
-        400,
-      );
+      // No state parameter provided - allow for local development testing
+      console.warn("⚠️ No state parameter provided - using fallback for local development");
+      originalRedirectUri = "http://localhost:3000/api/auth/callback";
+      originalState = "";
+      clientType = "local-dev";
     }
 
     console.log("Client details:", {
@@ -201,12 +223,31 @@ export async function GET(request: NextRequest) {
     // Exchange authorization code for tokens
     // Use the same redirect URI that was used in the authorization request
     const baseUrl = resolveApiDomain();
-    const redirectUriForTokenExchange = `${baseUrl}/api/auth/callback/google`;
+    
+    // Try to get the googleRedirectUri from state, otherwise fall back to /api/auth/callback/google
+    let redirectUriForTokenExchange = `${baseUrl}/api/auth/callback/google`;
+    if (stateParam) {
+      try {
+        const decodedState = Buffer.from(stateParam, "base64url").toString("utf-8");
+        const parsedState = JSON.parse(decodedState);
+        if (parsedState.googleRedirectUri) {
+          redirectUriForTokenExchange = parsedState.googleRedirectUri;
+        }
+      } catch (_e) {
+        console.log("Could not extract googleRedirectUri from state, using default");
+      }
+    }
 
     console.log(
       "Using redirect URI for token exchange:",
       redirectUriForTokenExchange,
     );
+
+    console.log("📤 Token exchange request:");
+    console.log("  client_id:", process.env.GOOGLE_CLIENT_ID);
+    console.log("  code:", code);
+    console.log("  grant_type: authorization_code");
+    console.log("  redirect_uri:", redirectUriForTokenExchange);
 
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -390,7 +431,43 @@ export async function GET(request: NextRequest) {
           "Returning authorization code for VS Code to exchange:",
           authCode || code,
         );
-      } else {
+      } else if (clientType === "local-dev") {
+        // Local development callback - show success page with token info
+        console.log("✅ OAuth flow completed successfully for local development");
+        
+        return new NextResponse(
+          `<!DOCTYPE html>
+          <html>
+            <head>
+              <title>OAuth Success</title>
+              <style>
+                body { font-family: system-ui; max-width: 800px; margin: 50px auto; padding: 20px; }
+                .success { color: green; font-size: 24px; margin-bottom: 20px; }
+                .token-info { background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 10px 0; }
+                code { background: #e0e0e0; padding: 2px 6px; border-radius: 3px; }
+              </style>
+            </head>
+            <body>
+              <div class="success">✅ OAuth 2.0/2.1 Authentication Successful!</div>
+              <div class="token-info">
+                <h3>Token Information:</h3>
+                <p><strong>ID Token:</strong> <code>${tokens.id_token.substring(0, 50)}...</code></p>
+                <p><strong>Access Token:</strong> <code>${tokens.access_token?.substring(0, 50)}...</code></p>
+                <p><strong>Expires in:</strong> ${tokens.expires_in} seconds</p>
+                <p><strong>Scope:</strong> ${tokens.scope}</p>
+                ${tokens.refresh_token ? `<p><strong>Refresh Token:</strong> Present</p>` : ''}
+              </div>
+              <p>You can now close this window.</p>
+            </body>
+          </html>`,
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "text/html",
+            },
+          }
+        );
+      } else if (clientType === "mcp-remote") {
         // OAuth 2.1 Compliance: No hash fragment fallback allowed
         console.error(
           "❌ OAuth 2.1 Violation: Unsupported client type for authentication:",

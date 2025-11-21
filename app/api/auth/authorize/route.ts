@@ -58,18 +58,23 @@ export async function GET(request: NextRequest) {
     "http://localhost:3334/oauth/callback",
     "http://127.0.0.1:33418/",
     "http://localhost:33418/",
+    "http://localhost:3000/api/auth/callback",
+    "http://127.0.0.1:3000/api/auth/callback",
   ];
 
   const vsCodePattern = /^http:\/\/127\.0\.0\.1:\d+\/$/;
   const vsCodeLocalhostPattern = /^http:\/\/localhost:\d+\/$/;
   const mcpRemotePattern =
     /^http:\/\/(127\.0\.0\.1|localhost):\d+\/oauth\/callback$/;
+  const localDevPattern =
+    /^http:\/\/(127\.0\.0\.1|localhost):\d+\/api\/auth\/callback$/;
 
   const isValidDynamicRedirect =
     redirectUri &&
     (vsCodePattern.test(redirectUri) ||
       vsCodeLocalhostPattern.test(redirectUri) ||
       mcpRemotePattern.test(redirectUri) ||
+      localDevPattern.test(redirectUri) ||
       redirectUri.startsWith("vscode://") ||
       redirectUri.startsWith("vscode-insiders://"));
 
@@ -109,13 +114,20 @@ export async function GET(request: NextRequest) {
   const googleOAuthUrl = new URL(
     "https://accounts.google.com/o/oauth2/v2/auth",
   );
+  
+  const redirectUriForGoogle = `${baseUrl}/api/auth/callback`;
+  console.log("🔐 Building Google OAuth URL:");
+  console.log("  baseUrl:", baseUrl);
+  console.log("  redirect_uri:", redirectUriForGoogle);
+  console.log("  client_id:", process.env.GOOGLE_CLIENT_ID ? "✓ set" : "✗ missing");
+  
   googleOAuthUrl.searchParams.set(
     "client_id",
     process.env.GOOGLE_CLIENT_ID || "",
   );
   googleOAuthUrl.searchParams.set(
     "redirect_uri",
-    `${baseUrl}/api/auth/callback/google`,
+    redirectUriForGoogle,
   );
   googleOAuthUrl.searchParams.set("response_type", "code");
   googleOAuthUrl.searchParams.set("scope", "openid profile email");
@@ -128,11 +140,14 @@ export async function GET(request: NextRequest) {
       authCode,
       originalState: state || "",
       originalRedirectUri: redirectUri || "",
+      googleRedirectUri: redirectUriForGoogle, // The redirect_uri we sent to Google
       resource: resource || `${baseUrl}/api/mcp`,
     }),
   ).toString("base64url");
 
   googleOAuthUrl.searchParams.set("state", encodedState);
+
+  console.log("✅ Redirecting to Google OAuth with URL:", googleOAuthUrl.toString().substring(0, 100) + "...");
 
   return NextResponse.redirect(googleOAuthUrl.toString());
 }
