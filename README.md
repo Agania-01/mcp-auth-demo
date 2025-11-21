@@ -2,6 +2,19 @@
 
 A production-ready **Model Context Protocol (MCP)** server with **OAuth 2.1 authentication** built using Next.js 15 and Google OAuth.
 
+## 📋 Week 7 Deliverable - OAuth-Secured MCP Hello Server
+
+**Live Deployment:** https://mcp-auth-demo-green.vercel.app  
+**GitHub Repository:** https://github.com/Agania-01/mcp-auth-demo  
+**OAuth Playbook:** [Complete Setup Guide](./oauth-playbook.md)
+
+### ✅ Deliverable Checklist
+- ✅ GitHub repository with OAuth 2.1 implementation
+- ✅ Working deployment on Vercel with end-to-end OAuth flow
+- ✅ `/oauth-playbook` documentation with client setup steps
+- ✅ Screenshots of authenticated Claude Desktop and VS Code sessions
+- ✅ Security documentation on token storage, scopes, and revocation
+
 ## 🎯 Status: Production Ready ✅
 
 **OAuth 2.1 Compliant** - Fully implements OAuth 2.1 authorization code flow with PKCE, removing deprecated implicit flow patterns.
