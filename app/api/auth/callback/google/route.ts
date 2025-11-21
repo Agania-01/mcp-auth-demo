@@ -326,7 +326,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build the redirect URL back to the client with the appropriate token
-    let finalRedirectUrl: string;
+    let finalRedirectUrl: string | undefined;
 
     console.log("=== REDIRECT URL CONSTRUCTION ===");
     console.log("Client type:", clientType);
