@@ -1,17 +1,12 @@
 {
 	"servers": {
-		"hello-mcp": {
+		"hello-mcp-vercel": {
 			"type": "http",
-			"url": "https://mcp-auth-demo-rust.vercel.app/api/mcp"
+			"url": "https://mcp-auth-demo-green.vercel.app/api/mcp"
 		},
 		"hello-mcp-local": {
 			"type": "http",
 			"url": "http://localhost:3000/api/mcp"
-		},
-		"my-mcp-server-4ce61e66": {
-			"type": "stdio",
-			"command": "Enter",
-			"args": []
 		}
 	},
 	"inputs": []
