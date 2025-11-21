@@ -502,15 +502,25 @@ export async function GET(request: NextRequest) {
 
     console.log("==================================");
 
-    console.log(
-      `✅ OAuth 2.1 Compliant: Final ${clientType} redirect URL (token masked):`,
-      finalRedirectUrl
-        .replace(tokens.id_token || "", "[ID_TOKEN_MASKED]")
-        .replace(tokens.access_token || "", "[ACCESS_TOKEN_MASKED]"),
-    );
+    if (clientType !== "local-dev" && finalRedirectUrl) {
+      console.log(
+        `✅ OAuth 2.1 Compliant: Final ${clientType} redirect URL (token masked):`,
+        finalRedirectUrl
+          .replace(tokens.id_token || "", "[ID_TOKEN_MASKED]")
+          .replace(tokens.access_token || "", "[ACCESS_TOKEN_MASKED]"),
+      );
 
-    // Redirect back to the client with the appropriate tokens
-    return NextResponse.redirect(finalRedirectUrl);
+      // Redirect back to the client with the appropriate tokens
+      return NextResponse.redirect(finalRedirectUrl);
+    }
+    
+    // This should never be reached for local-dev (returns early above)
+    // or for other client types (returns via redirect above)
+    return createOAuth21ErrorResponse(
+      "server_error",
+      "Unexpected flow completion",
+      500,
+    );
   } catch (err) {
     console.error("Error in OAuth callback:", err);
 
